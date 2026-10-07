@@ -18,9 +18,10 @@
     "supabase:types": "supabase gen types typescript --local > packages/shared/src/types/supabase.ts"
   },
   "devDependencies": {
+    "@types/node": "^20.12.0",
+    "supabase": "^2.120.0",
     "turbo": "^1.13.0",
-    "typescript": "^5.4.0",
-    "@types/node": "^20.12.0"
+    "typescript": "^5.4.0"
   },
   "engines": {
     "node": ">=18.17.0"
