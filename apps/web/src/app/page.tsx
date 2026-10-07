@@ -19,13 +19,13 @@ const benefits = [
 export default function HomePage() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#f8fafc] text-slate-950">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8" aria-label="Main navigation">
+      <nav className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8" aria-label="Main navigation">
         <Link href="/" className="text-lg font-semibold tracking-tight">RFP Orchestrator</Link>
         <div className="flex items-center gap-3"><Link href="/login" className="hidden text-sm font-medium text-slate-600 transition hover:text-slate-950 sm:block">Sign in</Link><Link href="/signup" className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-blue-600 px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">Join early access</Link></div>
       </nav>
 
       <section className="relative mx-auto max-w-7xl px-6 pb-24 pt-16 lg:px-8 lg:pb-32 lg:pt-24">
-        <div className="absolute -right-32 -top-20 -z-0 h-96 w-96 rounded-full bg-blue-100/70 blur-3xl" />
+        <div className="pointer-events-none absolute -right-32 -top-20 -z-0 h-96 w-96 rounded-full bg-blue-100/70 blur-3xl" />
         <div className="relative z-10 max-w-3xl"><p className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 shadow-sm">Built for proposal, sales engineering, and security teams</p>
           <h1 className="max-w-4xl text-5xl font-semibold leading-[1.05] tracking-tight text-slate-950 sm:text-6xl lg:text-7xl">Answer enterprise RFPs with confidence.</h1>
           <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">Enterprise questionnaires take days, pull engineers away from their work, and often lead to inconsistent answers. RFP Orchestrator helps your team find approved information, draft cited responses, and review what needs a human eye.</p>
