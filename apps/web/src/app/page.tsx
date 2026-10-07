@@ -21,7 +21,7 @@ export default function HomePage() {
     <main className="min-h-screen overflow-hidden bg-[#f8fafc] text-slate-950">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8" aria-label="Main navigation">
         <Link href="/" className="text-lg font-semibold tracking-tight">RFP Orchestrator</Link>
-        <div className="flex items-center gap-3"><Link href="/login" className="hidden text-sm font-medium text-slate-600 transition hover:text-slate-950 sm:block">Sign in</Link><Button asChild size="sm"><Link href="/signup">Join early access</Link></Button></div>
+        <div className="flex items-center gap-3"><Link href="/login" className="hidden text-sm font-medium text-slate-600 transition hover:text-slate-950 sm:block">Sign in</Link><Link href="/signup" className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-blue-600 px-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">Join early access</Link></div>
       </nav>
 
       <section className="relative mx-auto max-w-7xl px-6 pb-24 pt-16 lg:px-8 lg:pb-32 lg:pt-24">
