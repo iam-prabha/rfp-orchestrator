@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # Supabase Local Development
+  supabase:
+    image: supabase/cli:latest
+    command: start
+    ports:
+      - "5432:5432"    # PostgreSQL
+      - "5433:5433"    # pgbouncer
+      - "54321:54321"  # Studio
+      - "54322:54322"  # REST API
+      - "54323:54323"  # Realtime
+      - "54324:54324"  # Storage
+      - "54325:54325"  # Edge Functions
+    volumes:
+      - ./supabase:/supabase
+      - supabase_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Frontend
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.web
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=http://supabase:54321
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - supabase
+      - redis
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/web
+          target: /app
+        - action: rebuild
+          path: ./packages/shared
+
+  # API/Agent Services (optional - can run as separate services)
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    ports:
+      - "4000:4000"
+    environment:
+      - SUPABASE_URL=http://supabase:54321
+      - SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+      - REDIS_URL=redis://redis:6379
+      - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY}
+      - NVIDIA_NIM_ENDPOINT=https://integrate.api.nvidia.com/v1
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+    depends_on:
+      - supabase
+      - redis
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/api
+          target: /app
+        - action: rebuild
+          path: ./packages/ingestion
+        - action: rebuild
+          path: ./packages/retrieval
+        - action: rebuild
+          path: ./packages/drafting
+        - action: rebuild
+          path: ./packages/orchestrator
+
+volumes:
+  supabase_data:
+  redis_data:
+
+networks:
+  default:
+    name: rfp-orchestrator-network

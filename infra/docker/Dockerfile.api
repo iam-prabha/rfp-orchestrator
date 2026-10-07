@@ -1,0 +1,53 @@
+# Base image
+FROM node:20-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY package.json package-lock.json* turbo.json ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/ingestion/package.json ./packages/ingestion/
+COPY packages/retrieval/package.json ./packages/retrieval/
+COPY packages/drafting/package.json ./packages/drafting/
+COPY packages/orchestrator/package.json ./packages/orchestrator/
+
+RUN npm ci
+
+# Builder
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+RUN npm run build --filter=api
+
+# Runner
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodejs
+
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder --chown=nodejs:nodejs /app/packages/ingestion/dist ./packages/ingestion/dist
+COPY --from=builder --chown=nodejs:nodejs /app/packages/retrieval/dist ./packages/retrieval/dist
+COPY --from=builder --chown=nodejs:nodejs /app/packages/drafting/dist ./packages/drafting/dist
+COPY --from=builder --chown=nodejs:nodejs /app/packages/orchestrator/dist ./packages/orchestrator/dist
+
+# Copy package.json for dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
+USER nodejs
+
+EXPOSE 4000
+
+ENV PORT=4000
+
+CMD ["node", "dist/server.js"]
