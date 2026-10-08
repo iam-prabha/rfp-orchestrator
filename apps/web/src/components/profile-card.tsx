@@ -33,6 +33,7 @@ export function ProfileCard({ username, email, displayName }: { username: string
     }, { onConflict: 'id' });
 
     if (updateError) {
+      console.error('Profile update failed:', updateError);
       setError('We could not save your profile. Please try again.');
       setIsSaving(false);
       return;
