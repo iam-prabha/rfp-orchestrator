@@ -1,6 +1,10 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { ArrowRight, CheckCircle2, FileSearch, FileUp, MessageSquareText, ShieldCheck, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { createServerClient } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic';
 
 const steps = [
   { number: '01', title: 'Upload the RFP', description: 'Start with the questionnaire or RFP your team needs to answer.', icon: FileUp },
@@ -16,7 +20,10 @@ const benefits = [
   { title: 'Keep people in control', description: 'Flag uncertainty and let your team approve every final response.' },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { data: { user } } = await createServerClient().auth.getUser();
+  if (user) redirect('/dashboard');
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#f8fafc] text-slate-950">
       <nav className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8" aria-label="Main navigation">
