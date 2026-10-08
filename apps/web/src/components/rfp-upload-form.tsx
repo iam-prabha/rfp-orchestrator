@@ -80,6 +80,7 @@ export function RfpUploadForm() {
     });
 
     if (uploadError) {
+      console.error('RFP storage upload failed:', uploadError);
       setError('We could not upload that file. Check your connection and try again.');
       setIsUploading(false);
       return;
@@ -99,6 +100,7 @@ export function RfpUploadForm() {
     });
 
     if (recordError) {
+      console.error('RFP record creation failed:', recordError);
       await supabase.storage.from('rfp-files').remove([storagePath]);
       setError('The file uploaded, but we could not create its workspace record. Please try again.');
       setIsUploading(false);
