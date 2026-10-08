@@ -25,10 +25,12 @@ export function ProfileCard({ username, email, displayName }: { username: string
       return;
     }
 
-    const { error: updateError } = await supabase.from('profiles').update({
+    const { error: updateError } = await supabase.from('profiles').upsert({
+      id: user.id,
+      username,
       display_name: name.trim() || null,
       updated_at: new Date().toISOString(),
-    }).eq('id', user.id);
+    }, { onConflict: 'id' });
 
     if (updateError) {
       setError('We could not save your profile. Please try again.');
