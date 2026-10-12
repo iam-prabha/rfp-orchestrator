@@ -237,6 +237,8 @@ export interface Database {
       match_document_chunks: {
         Args: {
           query_embedding: number[];
+          requesting_user_id: string;
+          requested_rfp_id?: string | null;
           match_threshold: number;
           match_count: number;
         };
@@ -303,6 +305,9 @@ export interface RfpRow {
   chunkCount?: number;
   chunkingError?: string | null;
   chunkedAt?: string | null;
+  embeddingCount?: number;
+  embeddingError?: string | null;
+  embeddedAt?: string | null;
   userId: string;
   createdAt: string;
   updatedAt: string;

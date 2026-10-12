@@ -24,7 +24,7 @@ function requiredEnv(name: string) {
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   let ownedRfpId: string | null = null;
-  let processingStage: 'extraction' | 'chunking' = 'extraction';
+  let processingStage: 'extraction' | 'chunking' | 'embedding' = 'extraction';
   const authorization = request.headers.get('authorization');
   const accessToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : '';
 
@@ -58,6 +58,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       chunkingError: null,
       chunkCount: 0,
       chunkedAt: null,
+      embeddingError: null,
+      embeddingCount: 0,
+      embeddedAt: null,
     }).eq('id', rfp.id).eq('userId', user.id);
     if (processingError) throw new Error(processingError.message);
     if (rfp.fileSize > MAX_FILE_SIZE) throw new Error('The file is larger than the 10 MB limit.');
@@ -86,6 +89,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       supabaseServiceKey: requiredEnv('SUPABASE_SERVICE_ROLE_KEY'),
       nvidiaNimApiKey: process.env.NVIDIA_NIM_API_KEY || '',
       nvidiaNimEndpoint: process.env.NVIDIA_NIM_ENDPOINT || '',
+      embeddingModel: process.env.NVIDIA_EMBEDDING_MODEL || 'NV-Embed-QA',
     });
     processingStage = 'chunking';
     const chunks = retrievalAgent.chunkDocument(extracted.text, {
@@ -94,13 +98,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       fileType: rfp.fileType,
     });
     await retrievalAgent.storeDocumentChunksWithoutEmbeddings(rfp.id, chunks);
+    processingStage = 'embedding';
+    const embeddingCount = await retrievalAgent.embedStoredDocumentChunks(rfp.id);
 
     const chunkedAt = new Date().toISOString();
+    const embeddedAt = new Date().toISOString();
     const { error: readyError } = await adminClient.from('rfps').update({
       status: 'ready',
       chunkCount: chunks.length,
       chunkingError: null,
       chunkedAt,
+      embeddingCount,
+      embeddingError: null,
+      embeddedAt,
     }).eq('id', rfp.id).eq('userId', user.id);
     if (readyError) throw new Error(readyError.message);
 
@@ -115,9 +125,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         auth: { autoRefreshToken: false, persistSession: false },
       });
       if (ownedRfpId) {
-        const update = processingStage === 'chunking'
-          ? { status: 'failed', chunkingError: message }
-          : { status: 'failed', extractionError: message };
+        const update = processingStage === 'embedding'
+          ? { status: 'failed', embeddingError: message }
+          : processingStage === 'chunking'
+            ? { status: 'failed', chunkingError: message }
+            : { status: 'failed', extractionError: message };
         await adminClient.from('rfps').update(update).eq('id', ownedRfpId);
       }
     } catch (updateError) {

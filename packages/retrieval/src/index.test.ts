@@ -32,4 +32,24 @@ describe('RetrievalAgent.chunkDocument', () => {
   it('returns no chunks for empty documents', () => {
     expect(agent().chunkDocument('  \n\n  ')).toEqual([]);
   });
+
+  it('does not call NVIDIA for an empty embedding request', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch');
+    await expect(agent().generateEmbeddings([])).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it('validates embedding response dimensions', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{ index: 0, embedding: [1, 2], object: 'embedding' }],
+    }), { status: 200 }));
+    await expect(new RetrievalAgent({
+      supabaseUrl: 'http://localhost:54321',
+      supabaseServiceKey: 'test-key',
+      nvidiaNimApiKey: 'test-key',
+      nvidiaNimEndpoint: 'https://example.test/v1',
+    }).generateEmbeddings(['text'])).rejects.toThrow('expected 1024');
+    fetchMock.mockRestore();
+  });
 });

@@ -31,6 +31,11 @@ export interface RetrievalResult {
   processingTimeMs: number;
 }
 
+export interface RetrievalScope {
+  userId: string;
+  rfpId?: string;
+}
+
 export interface EmbeddingRequest {
   input: string[];
   model: string;
@@ -48,6 +53,9 @@ export interface EmbeddingResponse {
     totalTokens: number;
   };
 }
+
+const EMBEDDING_BATCH_SIZE = 32;
+const EMBEDDING_DIMENSION = 1024;
 
 interface ChunkWithOffsets {
   id?: string;
@@ -91,25 +99,41 @@ export class RetrievalAgent {
    * Generate embeddings using NVIDIA NIM
    */
   async generateEmbeddings(texts: string[]): Promise<number[][]> {
-    const response = await fetch(`${this.config.nvidiaNimEndpoint}/embeddings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.nvidiaNimApiKey}`,
-      },
-      body: JSON.stringify({
-        input: texts,
-        model: this.config.embeddingModel,
-      }),
-    });
+    if (texts.length === 0) return [];
+    if (!this.config.nvidiaNimApiKey) throw new Error('NVIDIA_NIM_API_KEY is not configured.');
+    if (!this.config.nvidiaNimEndpoint) throw new Error('NVIDIA_NIM_ENDPOINT is not configured.');
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`NVIDIA NIM embedding failed: ${response.status} - ${error}`);
+    const embeddings: number[][] = [];
+    for (let offset = 0; offset < texts.length; offset += EMBEDDING_BATCH_SIZE) {
+      const batch = texts.slice(offset, offset + EMBEDDING_BATCH_SIZE);
+      const response = await fetch(`${this.config.nvidiaNimEndpoint}/embeddings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.nvidiaNimApiKey}`,
+        },
+        body: JSON.stringify({ input: batch, model: this.config.embeddingModel }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`NVIDIA NIM embedding failed: ${response.status} - ${error}`);
+      }
+
+      const data = await response.json() as Partial<EmbeddingResponse>;
+      if (!Array.isArray(data.data) || data.data.length !== batch.length) {
+        throw new Error(`NVIDIA NIM returned ${data.data?.length || 0} embeddings for ${batch.length} inputs.`);
+      }
+
+      const ordered = [...data.data].sort((a, b) => a.index - b.index);
+      for (const item of ordered) {
+        if (!Array.isArray(item.embedding) || item.embedding.length !== EMBEDDING_DIMENSION) {
+          throw new Error(`NVIDIA NIM returned an embedding with dimension ${item.embedding?.length || 0}; expected ${EMBEDDING_DIMENSION}.`);
+        }
+        embeddings.push(item.embedding);
+      }
     }
-
-    const data = await response.json() as { data: Array<{ embedding: number[] }> };
-    return data.data.map((item) => item.embedding);
+    return embeddings;
   }
 
   /**
@@ -251,34 +275,32 @@ export class RetrievalAgent {
     documentId: string,
     chunks: Array<{ id: string; text: string; metadata: Record<string, unknown> }>
   ): Promise<void> {
-    // Generate embeddings for all chunks
-    const texts = chunks.map((c) => c.text);
-    const embeddings = await this.generateEmbeddings(texts);
+    await this.storeDocumentChunksWithoutEmbeddings(documentId, chunks);
+    await this.embedStoredDocumentChunks(documentId);
+  }
 
-    // Delete existing chunks for this document
-    await this.supabase
+  /** Generate and update embeddings for chunks already stored for a document. */
+  async embedStoredDocumentChunks(documentId: string): Promise<number> {
+    const { data, error } = await this.supabase
       .from('document_chunks')
-      .delete()
-      .eq('document_id', documentId);
+      .select('chunk_id, chunk_text')
+      .eq('document_id', documentId)
+      .order('chunk_id');
+    if (error) throw new Error(`Failed to load chunks for embedding: ${error.message}`);
 
-    // Insert new chunks with embeddings
-    const records = chunks.map((chunk, index) => ({
-      document_id: documentId,
-      chunk_id: chunk.id,
-      chunk_text: chunk.text,
-      start_offset: chunk.metadata.startOffset,
-      end_offset: chunk.metadata.endOffset,
-      metadata: chunk.metadata,
-      embedding: embeddings[index],
+    const chunks = data || [];
+    if (chunks.length === 0) return 0;
+    const embeddings = await this.generateEmbeddings(chunks.map((chunk) => chunk.chunk_text));
+
+    await Promise.all(chunks.map(async (chunk, index) => {
+      const { error: updateError } = await this.supabase
+        .from('document_chunks')
+        .update({ embedding: embeddings[index] })
+        .eq('document_id', documentId)
+        .eq('chunk_id', chunk.chunk_id);
+      if (updateError) throw new Error(`Failed to store embedding for chunk ${chunk.chunk_id}: ${updateError.message}`);
     }));
-
-    const { error } = await this.supabase
-      .from('document_chunks')
-      .insert(records);
-
-    if (error) {
-      throw new Error(`Failed to store chunks: ${error.message}`);
-    }
+    return chunks.length;
   }
 
   /**
@@ -286,6 +308,7 @@ export class RetrievalAgent {
    */
   async searchSimilar(
     query: string,
+    scope: RetrievalScope,
     options: SearchOptions = {}
   ): Promise<SearchResult[]> {
     const startTime = Date.now();
@@ -302,6 +325,8 @@ export class RetrievalAgent {
 
     const { data, error } = await this.supabase.rpc('match_document_chunks', {
       query_embedding: queryEmbedding,
+      requesting_user_id: scope.userId,
+      requested_rfp_id: scope.rfpId || null,
       match_threshold: similarityThreshold,
       match_count: limit,
     });
@@ -327,16 +352,12 @@ export class RetrievalAgent {
    */
   async hybridSearch(
     query: string,
+    scope: RetrievalScope,
     options: SearchOptions = {}
   ): Promise<SearchResult[]> {
-    // Vector search
-    const vectorResults = await this.searchSimilar(query, options);
-
-    // Keyword search (full-text search)
-    const keywordResults = await this.keywordSearch(query, options);
-
-    // Merge and rerank
-    return this.mergeAndRerank(vectorResults, keywordResults, options.limit || 10);
+    // Keep the public retrieval path ownership-safe and vector-backed until
+    // keyword ranking has a scoped ts_rank implementation.
+    return this.searchSimilar(query, scope, options);
   }
 
   private async keywordSearch(
@@ -415,26 +436,19 @@ export class RetrievalAgent {
    */
   async retrieveContext(
     question: string,
-    rfpId?: string,
+    scope: RetrievalScope,
     options: SearchOptions = {}
   ): Promise<RetrievalResult> {
     const startTime = Date.now();
 
     // Add RFP filter if provided
-    if (rfpId) {
-      options.filters = {
-        ...options.filters,
-        tags: [...(options.filters?.tags || []), `rfp:${rfpId}`],
-      };
-    }
-
-    const results = await this.hybridSearch(question, options);
+    const results = await this.hybridSearch(question, scope, options);
 
     // Emit event
     await this.emitEvent({
       type: 'retrieval_complete',
       agentId: 'retrieval',
-      rfpId: rfpId || 'unknown',
+      rfpId: scope.rfpId || 'unknown',
       payload: {
         question,
         resultCount: results.length,
@@ -445,7 +459,7 @@ export class RetrievalAgent {
 
     return {
       results,
-      queryEmbedding: (await this.generateEmbeddings([question]))[0],
+      queryEmbedding: await this.generateEmbeddings([question]).then((values) => values[0]),
       processingTimeMs: Date.now() - startTime,
     };
   }
