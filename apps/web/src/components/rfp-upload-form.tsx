@@ -73,7 +73,7 @@ export function RfpUploadForm() {
     }
 
     const rfpId = crypto.randomUUID();
-    const storagePath = `rfp/${user.id}/${rfpId}/${safeFileName(file.name)}`;
+    const storagePath = `${user.id}/${rfpId}/${safeFileName(file.name)}`;
     const { error: uploadError } = await supabase.storage.from('rfp-files').upload(storagePath, file, {
       contentType: file.type || 'application/octet-stream',
       upsert: false,
