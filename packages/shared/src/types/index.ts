@@ -21,6 +21,7 @@ export interface RFP {
 export type RFPStatus =
   | 'uploaded'
   | 'processing'
+  | 'processed'
   | 'reviewing'
   | 'completed'
   | 'failed';
@@ -294,6 +295,10 @@ export interface RfpRow {
   fileType: FileType;
   storagePath: string;
   metadata: RFPMetadata;
+  extractedText?: string | null;
+  extractionMetadata?: Record<string, unknown> | null;
+  extractionError?: string | null;
+  processedAt?: string | null;
   userId: string;
   createdAt: string;
   updatedAt: string;

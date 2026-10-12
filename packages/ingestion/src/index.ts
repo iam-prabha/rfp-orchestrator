@@ -4,6 +4,9 @@ import * as mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import * as cheerio from 'cheerio';
 import { v4 as uuidv4 } from 'uuid';
+import { extractDocument } from './extract';
+
+export { extractDocument, fileTypeForMimeType } from './extract';
 import {
   RFP,
   RFPMetadata,
@@ -57,13 +60,11 @@ export class IngestionAgent {
       }
 
       // Extract text based on file type
-      const extractedText = await this.extractText(file, mimeType);
-
-      // Extract metadata
-      const metadata = this.extractMetadata(extractedText, fileName);
+      const extracted = await extractDocument(file, fileName, mimeType);
+      const { text: extractedText, metadata } = extracted;
 
       // Store file in Supabase Storage
-      const storagePath = await this.storeFile(file, fileName, mimeType, uuidv4());
+      const storagePath = await this.storeFile(file, fileName, mimeType, uuidv4(), userId);
 
       // Create RFP record in database
       const rfp = await this.createRFPRecord(
@@ -247,9 +248,10 @@ export class IngestionAgent {
     file: Buffer,
     fileName: string,
     mimeType: string,
-    rfpId: string
+    rfpId: string,
+    userId: string,
   ): Promise<string> {
-    const storagePath = `rfp/${rfpId}/${fileName}`;
+    const storagePath = `${userId}/${rfpId}/${fileName}`;
 
     const { error } = await this.supabase.storage
       .from('rfp-files')

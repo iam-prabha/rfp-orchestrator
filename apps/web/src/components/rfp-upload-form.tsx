@@ -107,6 +107,26 @@ export function RfpUploadForm() {
       return;
     }
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      setError('Your session expired after upload. Sign in again to process this file.');
+      setIsUploading(false);
+      return;
+    }
+
+    const processingResponse = await fetch(`/api/rfps/${rfpId}/process`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!processingResponse.ok) {
+      console.error('RFP extraction failed:', await processingResponse.text());
+      router.push('/dashboard');
+      router.refresh();
+      return;
+    }
+
     router.push('/dashboard');
     router.refresh();
   }

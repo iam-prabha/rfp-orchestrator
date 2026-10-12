@@ -8,8 +8,7 @@ The project is in the foundation phase. The immediate goal is to make the reposi
 
 ## Project layout
 
-- `apps/web` — Next.js web application.
-- `apps/api` — small API service for health checks and future orchestration endpoints.
+- `apps/web` — Next.js web application and server-side API routes.
 - `packages/shared` — shared types and utilities.
 - `packages/ingestion` — document validation and text extraction.
 - `packages/retrieval` — chunking, embeddings, and search.
@@ -44,6 +43,11 @@ Do not put real credentials in `.env.example` or commit local environment files.
 - [x] Shared domain types and utilities available.
 - [x] Basic web application scaffold available.
 - [x] API health endpoint scaffold available.
-- [ ] Add database migrations and Row Level Security policies.
+- [x] Add database migrations and Row Level Security policies.
 - [ ] Add representative test documents and an evaluation set.
-- [ ] Implement the upload and document-status workflow.
+- [x] Implement the upload and document-status workflow.
+- [x] Implement the initial document text-extraction pipeline.
+
+## Current progress
+
+Completed through authenticated RFP document upload, extraction, and initial processing statuses. End-to-end Supabase/Vercel validation remains before starting chunking and retrieval.
