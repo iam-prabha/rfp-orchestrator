@@ -22,6 +22,7 @@ export type RFPStatus =
   | 'uploaded'
   | 'processing'
   | 'processed'
+  | 'ready'
   | 'reviewing'
   | 'completed'
   | 'failed';
@@ -277,7 +278,7 @@ export interface DocumentChunkRow {
   start_offset: number;
   end_offset: number;
   metadata: Record<string, unknown>;
-  embedding: number[];
+  embedding: number[] | null;
   similarity_score?: number;
   rank?: number;
 }
@@ -299,6 +300,9 @@ export interface RfpRow {
   extractionMetadata?: Record<string, unknown> | null;
   extractionError?: string | null;
   processedAt?: string | null;
+  chunkCount?: number;
+  chunkingError?: string | null;
+  chunkedAt?: string | null;
   userId: string;
   createdAt: string;
   updatedAt: string;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { extractDocument } from '@repo/ingestion';
+import { RetrievalAgent } from '@repo/retrieval';
 
 export const runtime = 'nodejs';
 
@@ -22,14 +23,17 @@ function requiredEnv(name: string) {
 }
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+  let ownedRfpId: string | null = null;
+  let processingStage: 'extraction' | 'chunking' = 'extraction';
   const authorization = request.headers.get('authorization');
   const accessToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : '';
 
   if (!accessToken) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
   try {
-    const supabaseUrl = requiredEnv('SUPABASE_URL');
-    const authClient = createClient(supabaseUrl, requiredEnv('SUPABASE_ANON_KEY'));
+    const supabaseUrl = process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
+    const anonKey = process.env.SUPABASE_ANON_KEY || requiredEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    const authClient = createClient(supabaseUrl, anonKey);
     const adminClient = createClient(supabaseUrl, requiredEnv('SUPABASE_SERVICE_ROLE_KEY'), {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -47,7 +51,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (rfpError) throw new Error(rfpError.message);
     if (!rfp) return NextResponse.json({ error: 'RFP not found.' }, { status: 404 });
 
-    await adminClient.from('rfps').update({ status: 'processing', extractionError: null }).eq('id', rfp.id);
+    ownedRfpId = rfp.id;
+    const { error: processingError } = await adminClient.from('rfps').update({
+      status: 'processing',
+      extractionError: null,
+      chunkingError: null,
+      chunkCount: 0,
+      chunkedAt: null,
+    }).eq('id', rfp.id).eq('userId', user.id);
+    if (processingError) throw new Error(processingError.message);
     if (rfp.fileSize > MAX_FILE_SIZE) throw new Error('The file is larger than the 10 MB limit.');
 
     const { data: file, error: downloadError } = await adminClient.storage.from('rfp-files').download(rfp.storagePath);
@@ -65,20 +77,49 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       extractionMetadata: { ...extracted.metadata, warnings: extracted.warnings },
       extractionError: extracted.warnings.length ? extracted.warnings.join(' ') : null,
       processedAt: new Date().toISOString(),
-    }).eq('id', rfp.id);
+    }).eq('id', rfp.id).eq('userId', user.id);
 
     if (updateError) throw new Error(updateError.message);
-    return NextResponse.json({ id: rfp.id, status: 'processed', warnings: extracted.warnings });
+
+    const retrievalAgent = new RetrievalAgent({
+      supabaseUrl,
+      supabaseServiceKey: requiredEnv('SUPABASE_SERVICE_ROLE_KEY'),
+      nvidiaNimApiKey: process.env.NVIDIA_NIM_API_KEY || '',
+      nvidiaNimEndpoint: process.env.NVIDIA_NIM_ENDPOINT || '',
+    });
+    processingStage = 'chunking';
+    const chunks = retrievalAgent.chunkDocument(extracted.text, {
+      rfpId: rfp.id,
+      sourceFileName: rfp.fileName,
+      fileType: rfp.fileType,
+    });
+    await retrievalAgent.storeDocumentChunksWithoutEmbeddings(rfp.id, chunks);
+
+    const chunkedAt = new Date().toISOString();
+    const { error: readyError } = await adminClient.from('rfps').update({
+      status: 'ready',
+      chunkCount: chunks.length,
+      chunkingError: null,
+      chunkedAt,
+    }).eq('id', rfp.id).eq('userId', user.id);
+    if (readyError) throw new Error(readyError.message);
+
+    return NextResponse.json({ id: rfp.id, status: 'ready', chunkCount: chunks.length, warnings: extracted.warnings });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Document extraction failed.';
     console.error('RFP extraction failed:', error);
 
     try {
-      const supabaseUrl = requiredEnv('SUPABASE_URL');
+      const supabaseUrl = process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
       const adminClient = createClient(supabaseUrl, requiredEnv('SUPABASE_SERVICE_ROLE_KEY'), {
         auth: { autoRefreshToken: false, persistSession: false },
       });
-      await adminClient.from('rfps').update({ status: 'failed', extractionError: message }).eq('id', params.id);
+      if (ownedRfpId) {
+        const update = processingStage === 'chunking'
+          ? { status: 'failed', chunkingError: message }
+          : { status: 'failed', extractionError: message };
+        await adminClient.from('rfps').update(update).eq('id', ownedRfpId);
+      }
     } catch (updateError) {
       console.error('Failed to record extraction error:', updateError);
     }

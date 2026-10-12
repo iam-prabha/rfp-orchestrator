@@ -120,38 +120,56 @@ export class RetrievalAgent {
     text: string;
     metadata: Record<string, unknown>;
   }> {
-    // Try semantic chunking first (by paragraphs)
-    const paragraphs = text.split(/\n\s*\n/);
+    if (!text.trim()) return [];
+
+    // Keep paragraph boundaries where possible. Offsets are calculated from
+    // the original string rather than from a reconstructed join of paragraphs.
+    const paragraphs: Array<{ start: number; end: number }> = [];
+    const paragraphPattern = /[^\n]*(?:\n(?!\s*\n)[^\n]*)*/g;
+    let match: RegExpExecArray | null;
+    while ((match = paragraphPattern.exec(text))) {
+      if (match[0].trim()) paragraphs.push({ start: match.index, end: match.index + match[0].length });
+      if (match[0].length === 0) paragraphPattern.lastIndex += 1;
+    }
+
     const chunks: ChunkWithOffsets[] = [];
-    let currentChunk = '';
-    let startPos = 0;
+    let groupStart: number | null = null;
+    let groupEnd = 0;
+
+    const addTrimmedChunk = (start: number, end: number) => {
+      const value = text.slice(start, end);
+      const leadingWhitespace = value.search(/\S/);
+      const trailingWhitespace = value.search(/\s*$/);
+      if (leadingWhitespace === -1) return;
+      const trimmedStart = start + leadingWhitespace;
+      const trimmedEnd = start + trailingWhitespace;
+      chunks.push({ text: text.slice(trimmedStart, trimmedEnd), startOffset: trimmedStart, endOffset: trimmedEnd });
+    };
 
     for (const paragraph of paragraphs) {
-      if ((currentChunk + paragraph).length > this.config.chunkSize && currentChunk) {
-        chunks.push({
-          text: currentChunk.trim(),
-          startOffset: startPos,
-          endOffset: startPos + currentChunk.length,
-        });
-        startPos += currentChunk.length;
-        currentChunk = paragraph;
-      } else {
-        currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+      if (paragraph.end - paragraph.start > this.config.chunkSize) {
+        if (groupStart !== null) {
+          addTrimmedChunk(groupStart, groupEnd);
+          groupStart = null;
+        }
+        chunks.push(...this.slidingWindowChunk(text.slice(paragraph.start, paragraph.end), metadata, paragraph.start).map((chunk) => ({
+          text: chunk.text,
+          startOffset: Number(chunk.metadata.startOffset),
+          endOffset: Number(chunk.metadata.endOffset),
+        })));
+        continue;
       }
+
+      if (groupStart !== null && paragraph.end - groupStart > this.config.chunkSize) {
+        addTrimmedChunk(groupStart, groupEnd);
+        groupStart = paragraph.start;
+      } else {
+        groupStart = groupStart === null ? paragraph.start : groupStart;
+      }
+      groupEnd = paragraph.end;
     }
 
-    if (currentChunk.trim()) {
-      chunks.push({
-        text: currentChunk.trim(),
-        startOffset: startPos,
-        endOffset: startPos + currentChunk.length,
-      });
-    }
-
-    // If chunks are too large, apply sliding window
-    if (chunks.some((c) => c.text.length > this.config.chunkSize * 1.5)) {
-      return this.slidingWindowChunk(text, metadata);
-    }
+    if (groupStart !== null) addTrimmedChunk(groupStart, groupEnd);
 
     return chunks.map((chunk, index) => ({
       id: uuidv4(),
@@ -165,7 +183,7 @@ export class RetrievalAgent {
     }));
   }
 
-  private slidingWindowChunk(text: string, metadata: Record<string, unknown>): Array<{
+  private slidingWindowChunk(text: string, metadata: Record<string, unknown>, offset = 0): Array<{
     id: string;
     text: string;
     metadata: Record<string, unknown>;
@@ -176,33 +194,54 @@ export class RetrievalAgent {
     const overlap = this.config.chunkOverlap;
 
     while (start < text.length) {
-      const end = Math.min(start + this.config.chunkSize, text.length);
-      let actualEnd = end;
-
-      // Try to break at sentence boundary
-      if (end < text.length) {
-        const lastPeriod = text.lastIndexOf('.', end);
-        if (lastPeriod > start + this.config.chunkSize * 0.5) {
-          actualEnd = lastPeriod + 1;
-        }
-      }
+      const actualEnd = Math.min(start + this.config.chunkSize, text.length);
+      const value = text.slice(start, actualEnd);
+      const leadingWhitespace = value.search(/\S/);
+      const trailingWhitespace = value.search(/\s*$/);
+      const contentStart = leadingWhitespace === -1 ? start : start + leadingWhitespace;
+      const contentEnd = leadingWhitespace === -1 ? actualEnd : start + trailingWhitespace;
 
       chunks.push({
         id: `${uuidv4()}`,
-        text: text.slice(start, actualEnd).trim(),
+        text: text.slice(contentStart, contentEnd),
         metadata: {
           ...metadata,
-          startOffset: start,
-          endOffset: actualEnd,
+          startOffset: offset + contentStart,
+          endOffset: offset + contentEnd,
           chunkType: 'sliding-window',
         },
       });
 
-      start = actualEnd - overlap;
-      if (start < 0) start = 0;
+      if (actualEnd === text.length) break;
+      start = Math.max(start + 1, actualEnd - overlap);
     }
 
     return chunks;
+  }
+
+  /** Store chunks for retrieval preparation. Embeddings are intentionally added later. */
+  async storeDocumentChunksWithoutEmbeddings(
+    documentId: string,
+    chunks: Array<{ id: string; text: string; metadata: Record<string, unknown> }>,
+  ): Promise<void> {
+    const { error: deleteError } = await this.supabase
+      .from('document_chunks')
+      .delete()
+      .eq('document_id', documentId);
+    if (deleteError) throw new Error(`Failed to replace existing chunks: ${deleteError.message}`);
+
+    if (chunks.length === 0) return;
+
+    const records = chunks.map((chunk) => ({
+      document_id: documentId,
+      chunk_id: chunk.id,
+      chunk_text: chunk.text,
+      start_offset: chunk.metadata.startOffset,
+      end_offset: chunk.metadata.endOffset,
+      metadata: chunk.metadata,
+    }));
+    const { error } = await this.supabase.from('document_chunks').insert(records);
+    if (error) throw new Error(`Failed to store chunks: ${error.message}`);
   }
 
   /**
