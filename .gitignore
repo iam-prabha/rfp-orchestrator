@@ -61,3 +61,5 @@ logs/
 
 # docker
 .docker/
+# product specs (local only)
+spec/
