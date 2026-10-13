@@ -46,6 +46,21 @@ export interface RFPMetadata {
   sections: number;
 }
 
+export type QuestionType = 'technical' | 'commercial' | 'security' | 'legal' | 'general';
+
+export interface Question {
+  id: string;
+  rfpId: string;
+  questionText: string;
+  section: string;
+  order: number;
+  type: QuestionType;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
 export interface Answer {
   id: string;
   rfpId: string;
@@ -228,11 +243,13 @@ export interface Database {
   public: {
     Tables: {
       answers: DatabaseTable<AnswerRow>;
+      questions: DatabaseTable<QuestionRow>;
       document_chunks: DatabaseTable<DocumentChunkRow>;
       rfps: DatabaseTable<RfpRow>;
       agent_events: DatabaseTable<AgentEventRow>;
     };
     Views: {};
+
     Functions: {
       match_document_chunks: {
         Args: {
@@ -272,7 +289,20 @@ export interface AnswerRow {
   updatedAt: string;
 }
 
+export interface QuestionRow {
+  id: string;
+  rfp_id: string;
+  question_text: string;
+  section: string;
+  question_order: number;
+  question_type: QuestionType;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DocumentChunkRow {
+
   id: string;
   document_id: string;
   chunk_id: string;

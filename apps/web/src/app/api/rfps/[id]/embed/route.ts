@@ -17,14 +17,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   let ownedRfpId: string | null = null;
   try {
-    const supabaseUrl = process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
-    const anonKey = process.env.SUPABASE_ANON_KEY || requiredEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
     const serviceKey = requiredEnv('SUPABASE_SERVICE_ROLE_KEY');
-    const authClient = createClient(supabaseUrl, anonKey);
     const adminClient = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const { data: { user }, error: authError } = await authClient.auth.getUser(accessToken);
+    const { data: { user }, error: authError } = await adminClient.auth.getUser(accessToken);
     if (authError || !user) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
     const { data: rfp, error: rfpError } = await adminClient
@@ -50,7 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       supabaseServiceKey: serviceKey,
       nvidiaNimApiKey: requiredEnv('NVIDIA_NIM_API_KEY'),
       nvidiaNimEndpoint: requiredEnv('NVIDIA_NIM_ENDPOINT'),
-      embeddingModel: process.env.NVIDIA_EMBEDDING_MODEL || 'NV-Embed-QA',
+      embeddingModel: process.env.NVIDIA_EMBEDDING_MODEL || 'nvidia/nemotron-3-embed-1b',
     });
     const embeddingCount = await agent.embedStoredDocumentChunks(rfp.id);
     const embeddedAt = new Date().toISOString();
@@ -68,7 +66,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     console.error('RFP embedding failed:', error);
     if (ownedRfpId) {
       try {
-        const supabaseUrl = process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
         const adminClient = createClient(supabaseUrl, requiredEnv('SUPABASE_SERVICE_ROLE_KEY'), {
           auth: { autoRefreshToken: false, persistSession: false },
         });

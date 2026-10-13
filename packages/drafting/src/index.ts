@@ -314,7 +314,8 @@ export class DraftingAgent {
       stopSequences: string[];
     }
   ): Promise<LLMResponse> {
-    const response = await fetch(`${this.config.nvidiaNimEndpoint}/completions`, {
+    const base = this.config.nvidiaNimEndpoint.replace(/\/+$/, '');
+    const response = await fetch(`${base}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -322,7 +323,7 @@ export class DraftingAgent {
       },
       body: JSON.stringify({
         model: this.config.nvidiaNimModel,
-        prompt: prompt,
+        messages: [{ role: 'user', content: prompt }],
         max_tokens: options.maxTokens,
         temperature: options.temperature,
         stop: options.stopSequences,
@@ -336,15 +337,21 @@ export class DraftingAgent {
     }
 
     const data = (await response.json()) as {
-      choices: Array<{ text: string; finish_reason: string }>;
+      choices: Array<{
+        message?: { content: string };
+        text?: string;
+        finish_reason: string;
+      }>;
       usage: LLMResponse['usage'];
       model: string;
     };
+
+    const text = data.choices[0]?.message?.content ?? data.choices[0]?.text ?? '';
     return {
-      text: data.choices[0].text,
+      text,
       usage: data.usage,
       model: data.model,
-      finishReason: data.choices[0].finish_reason,
+      finishReason: data.choices[0]?.finish_reason ?? 'stop',
     };
   }
 
@@ -453,4 +460,6 @@ class PromptTemplate {
   }
 }
 
+export { PromptRegistry, type VersionedPrompt } from './prompt-registry';
 export default DraftingAgent;
+

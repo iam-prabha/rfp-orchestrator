@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, FileUp, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileUp, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase';
@@ -136,5 +136,46 @@ export function RfpUploadForm() {
   }
 
   const stageLabel = uploadStage === 'uploading' ? 'Uploading…' : uploadStage === 'extracting' ? 'Extracting text…' : 'Preparing document…';
-  return <main className="min-h-screen bg-slate-50"><header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center px-6 py-5 lg:px-8"><Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-950"><ArrowLeft className="h-4 w-4" /> Back to workspace</Link></div></header><section className="mx-auto max-w-2xl px-6 py-16 lg:px-8"><p className="text-sm font-medium text-blue-600">New RFP</p><h1 className="mt-3 text-4xl font-semibold tracking-tight">Upload a questionnaire</h1><p className="mt-4 text-slate-600">Add the original document to start a response workspace. We’ll extract its text and prepare it for retrieval.</p><form onSubmit={handleSubmit} className="mt-10 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><label htmlFor="rfp-file" className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-slate-300 px-6 py-12 text-center transition hover:border-blue-400 hover:bg-blue-50/30"><FileUp className="h-8 w-8 text-blue-600" /><span className="mt-4 font-medium text-slate-900">Choose an RFP or questionnaire</span><span className="mt-2 text-sm text-slate-500">PDF, DOCX, XLSX, TXT, or Markdown · 10 MB maximum</span><input id="rfp-file" type="file" accept=".pdf,.docx,.xlsx,.txt,.md" onChange={handleFileChange} className="sr-only" /></label>{file && <p className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">Selected: <span className="font-medium">{file.name}</span></p>}{error && <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm leading-6 text-red-700">{error}</p>}<Button type="submit" className="mt-6 w-full" disabled={isUploading}>{isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {isUploading ? stageLabel : 'Upload RFP'}</Button></form></section></main>;
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center px-6 py-5 lg:px-8">
+          <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-950">
+            <ArrowLeft className="h-4 w-4" /> Back to workspace
+          </Link>
+        </div>
+      </header>
+      <section className="mx-auto max-w-2xl px-6 py-16 lg:px-8">
+        <p className="text-sm font-medium text-blue-600">New RFP</p>
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight">Upload a questionnaire</h1>
+        <p className="mt-4 text-slate-600">Add the original document to start a response workspace. We’ll extract its text and prepare it for retrieval.</p>
+        <form onSubmit={handleSubmit} className="mt-10 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <label htmlFor="rfp-file" className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-slate-300 px-6 py-12 text-center transition hover:border-blue-400 hover:bg-blue-50/30">
+            <FileUp className="h-8 w-8 text-blue-600" />
+            <span className="mt-4 font-medium text-slate-900">Choose an RFP or questionnaire</span>
+            <span className="mt-2 text-sm text-slate-500">PDF, DOCX, XLSX, TXT, or Markdown · 10 MB maximum</span>
+            <input id="rfp-file" type="file" accept=".pdf,.docx,.xlsx,.txt,.md" onChange={handleFileChange} className="sr-only" />
+          </label>
+          {file && (
+            <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              <p className="truncate">Selected: <span className="font-medium text-slate-900">{file.name}</span></p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setFile(null)}
+                className="h-7 px-2 text-xs text-slate-500 hover:text-red-600"
+              >
+                <X className="h-3.5 w-3.5 mr-1" /> Remove
+              </Button>
+            </div>
+          )}
+          {error && <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm leading-6 text-red-700">{error}</p>}
+          <Button type="submit" className="mt-6 w-full" disabled={isUploading}>
+            {isUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {isUploading ? stageLabel : 'Upload RFP'}
+          </Button>
+        </form>
+      </section>
+    </main>
+  );
 }

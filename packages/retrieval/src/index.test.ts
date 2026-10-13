@@ -49,7 +49,7 @@ describe('RetrievalAgent.chunkDocument', () => {
       supabaseServiceKey: 'test-key',
       nvidiaNimApiKey: 'test-key',
       nvidiaNimEndpoint: 'https://example.test/v1',
-    }).generateEmbeddings(['text'])).rejects.toThrow('expected 1024');
+    }).generateEmbeddings(['text'])).rejects.toThrow('expected 2048');
     fetchMock.mockRestore();
   });
 });

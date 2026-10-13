@@ -39,6 +39,7 @@ export interface RetrievalScope {
 export interface EmbeddingRequest {
   input: string[];
   model: string;
+  input_type: 'passage' | 'query';
 }
 
 export interface EmbeddingResponse {
@@ -55,7 +56,7 @@ export interface EmbeddingResponse {
 }
 
 const EMBEDDING_BATCH_SIZE = 32;
-const EMBEDDING_DIMENSION = 1024;
+const EMBEDDING_DIMENSION = 2048;
 
 interface ChunkWithOffsets {
   id?: string;
@@ -85,9 +86,9 @@ export class RetrievalAgent {
       supabaseServiceKey: config.supabaseServiceKey,
       nvidiaNimApiKey: config.nvidiaNimApiKey,
       nvidiaNimEndpoint: config.nvidiaNimEndpoint,
-      embeddingModel: config.embeddingModel || 'NV-Embed-QA',
+      embeddingModel: config.embeddingModel || 'nvidia/nemotron-3-embed-1b',
       maxChunksPerQuery: config.maxChunksPerQuery || 10,
-      similarityThreshold: config.similarityThreshold || 0.7,
+      similarityThreshold: config.similarityThreshold ?? 0.2,
       chunkSize: config.chunkSize || 1000,
       chunkOverlap: config.chunkOverlap || 200,
     };
@@ -98,7 +99,7 @@ export class RetrievalAgent {
   /**
    * Generate embeddings using NVIDIA NIM
    */
-  async generateEmbeddings(texts: string[]): Promise<number[][]> {
+  async generateEmbeddings(texts: string[], inputType: 'passage' | 'query' = 'passage'): Promise<number[][]> {
     if (texts.length === 0) return [];
     if (!this.config.nvidiaNimApiKey) throw new Error('NVIDIA_NIM_API_KEY is not configured.');
     if (!this.config.nvidiaNimEndpoint) throw new Error('NVIDIA_NIM_ENDPOINT is not configured.');
@@ -106,13 +107,14 @@ export class RetrievalAgent {
     const embeddings: number[][] = [];
     for (let offset = 0; offset < texts.length; offset += EMBEDDING_BATCH_SIZE) {
       const batch = texts.slice(offset, offset + EMBEDDING_BATCH_SIZE);
-      const response = await fetch(`${this.config.nvidiaNimEndpoint}/embeddings`, {
+      const endpoint = this.config.nvidiaNimEndpoint.replace(/\/+$/, '');
+      const response = await fetch(`${endpoint}/embeddings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.config.nvidiaNimApiKey}`,
         },
-        body: JSON.stringify({ input: batch, model: this.config.embeddingModel }),
+        body: JSON.stringify({ input: batch, model: this.config.embeddingModel, input_type: inputType }),
       });
 
       if (!response.ok) {
@@ -314,7 +316,7 @@ export class RetrievalAgent {
     const startTime = Date.now();
 
     // Generate query embedding
-    const queryEmbeddings = await this.generateEmbeddings([query]);
+    const queryEmbeddings = await this.generateEmbeddings([query], 'query');
     const queryEmbedding = queryEmbeddings[0];
 
     const {
@@ -452,14 +454,14 @@ export class RetrievalAgent {
       payload: {
         question,
         resultCount: results.length,
-        processingTimeMs: Date.now() - Date.now(),
+        processingTimeMs: Date.now() - startTime,
       },
       timestamp: new Date(),
     });
 
     return {
       results,
-      queryEmbedding: await this.generateEmbeddings([question]).then((values) => values[0]),
+      queryEmbedding: [],
       processingTimeMs: Date.now() - startTime,
     };
   }

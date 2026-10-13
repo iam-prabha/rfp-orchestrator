@@ -1,6 +1,4 @@
-import pdfParse from 'pdf-parse';
-import * as mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
+import './buffer-polyfill';
 import type { FileType, RFPMetadata } from '@repo/shared';
 
 export interface ExtractedDocument {
@@ -42,14 +40,18 @@ export function fileTypeForMimeType(mimeType: string): FileType {
 async function extractText(file: Buffer, mimeType: string): Promise<string> {
   switch (mimeType) {
     case 'application/pdf': {
+      const pdfParseModule = await import('pdf-parse');
+      const pdfParse = pdfParseModule.default || pdfParseModule;
       const data = await pdfParse(file);
       return data.text;
     }
     case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
+      const mammoth = await import('mammoth');
       const result = await mammoth.extractRawText({ buffer: file });
       return result.value;
     }
     case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+      const XLSX = await import('xlsx');
       const workbook = XLSX.read(file, { type: 'buffer' });
       return workbook.SheetNames.map((sheetName) => {
         const worksheet = workbook.Sheets[sheetName];

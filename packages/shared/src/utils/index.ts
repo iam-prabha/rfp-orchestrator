@@ -117,3 +117,5 @@ export async function retry<T>(
     return retry(fn, retries - 1, delay * 2);
   }
 }
+
+export * from './retry';

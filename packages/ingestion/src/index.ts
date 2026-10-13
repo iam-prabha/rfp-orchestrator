@@ -1,12 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import pdfParse from 'pdf-parse';
-import * as mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
-import * as cheerio from 'cheerio';
 import { v4 as uuidv4 } from 'uuid';
 import { extractDocument } from './extract';
 
 export { extractDocument, fileTypeForMimeType } from './extract';
+export { QuestionExtractionAgent, type ExtractedQuestionCandidate } from './question-extractor';
+export { ensureBufferPolyfill } from './buffer-polyfill';
+
 import {
   RFP,
   RFPMetadata,
@@ -129,46 +128,6 @@ export class IngestionAgent {
     return { success: true };
   }
 
-  /**
-   * Extract text from various file types
-   */
-  private async extractText(file: Buffer, mimeType: string): Promise<string> {
-    switch (mimeType) {
-      case 'application/pdf':
-        return this.extractPdfText(file);
-      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-        return await this.extractDocxText(file);
-      case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-        return await this.extractExcelText(file);
-      case 'text/plain':
-        return file.toString('utf-8');
-      default:
-        throw new Error(`Unsupported mime type: ${mimeType}`);
-    }
-  }
-
-  private async extractPdfText(buffer: Buffer): Promise<string> {
-    const data = await pdfParse(buffer);
-    return data.text;
-  }
-
-  private async extractDocxText(buffer: Buffer): Promise<string> {
-    const result = await mammoth.extractRawText({ buffer });
-    return result.value;
-  }
-
-  private async extractExcelText(buffer: Buffer): Promise<string> {
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheets: string[] = [];
-
-    workbook.SheetNames.forEach((sheetName) => {
-      const worksheet = workbook.Sheets[sheetName];
-      const csv = XLSX.utils.sheet_to_csv(worksheet);
-      sheets.push(`--- Sheet: ${sheetName} ---\n${csv}`);
-    });
-
-    return sheets.join('\n\n');
-  }
 
   /**
    * Extract metadata from extracted text

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { extractDocument } from '@repo/ingestion';
+import { extractDocument, QuestionExtractionAgent, ensureBufferPolyfill } from '@repo/ingestion';
 import { RetrievalAgent } from '@repo/retrieval';
+
+ensureBufferPolyfill();
 
 export const runtime = 'nodejs';
 
@@ -31,13 +33,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (!accessToken) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
   try {
-    const supabaseUrl = process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
-    const anonKey = process.env.SUPABASE_ANON_KEY || requiredEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-    const authClient = createClient(supabaseUrl, anonKey);
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
     const adminClient = createClient(supabaseUrl, requiredEnv('SUPABASE_SERVICE_ROLE_KEY'), {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const { data: { user }, error: authError } = await authClient.auth.getUser(accessToken);
+    const { data: { user }, error: authError } = await adminClient.auth.getUser(accessToken);
 
     if (authError || !user) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       supabaseServiceKey: requiredEnv('SUPABASE_SERVICE_ROLE_KEY'),
       nvidiaNimApiKey: process.env.NVIDIA_NIM_API_KEY || '',
       nvidiaNimEndpoint: process.env.NVIDIA_NIM_ENDPOINT || '',
-      embeddingModel: process.env.NVIDIA_EMBEDDING_MODEL || 'NV-Embed-QA',
+      embeddingModel: process.env.NVIDIA_EMBEDDING_MODEL || 'nvidia/nemotron-3-embed-1b',
     });
     processingStage = 'chunking';
     const chunks = retrievalAgent.chunkDocument(extracted.text, {
@@ -103,6 +103,27 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const chunkedAt = new Date().toISOString();
     const embeddedAt = new Date().toISOString();
+
+    // Extract questions using QuestionExtractionAgent
+    const questionExtractor = new QuestionExtractionAgent();
+    const extractionResult = await questionExtractor.extractQuestions(extracted.text, rfp.id);
+    const questions = extractionResult.success && extractionResult.data ? extractionResult.data : [];
+
+    if (questions.length > 0) {
+      await adminClient.from('questions').delete().eq('rfp_id', rfp.id);
+      await adminClient.from('questions').insert(
+        questions.map((q) => ({
+          id: q.id,
+          rfp_id: rfp.id,
+          question_text: q.questionText,
+          section: q.section,
+          question_order: q.order,
+          question_type: q.type,
+          metadata: q.metadata,
+        }))
+      );
+    }
+
     const { error: readyError } = await adminClient.from('rfps').update({
       status: 'ready',
       chunkCount: chunks.length,
@@ -114,13 +135,20 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }).eq('id', rfp.id).eq('userId', user.id);
     if (readyError) throw new Error(readyError.message);
 
-    return NextResponse.json({ id: rfp.id, status: 'ready', chunkCount: chunks.length, warnings: extracted.warnings });
+    return NextResponse.json({
+      id: rfp.id,
+      status: 'ready',
+      chunkCount: chunks.length,
+      questionCount: questions.length,
+      warnings: extracted.warnings,
+    });
   } catch (error) {
+
     const message = error instanceof Error ? error.message : 'Document extraction failed.';
     console.error('RFP extraction failed:', error);
 
     try {
-      const supabaseUrl = process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
       const adminClient = createClient(supabaseUrl, requiredEnv('SUPABASE_SERVICE_ROLE_KEY'), {
         auth: { autoRefreshToken: false, persistSession: false },
       });
