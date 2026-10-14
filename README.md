@@ -1,53 +1,74 @@
 # RFP Orchestrator
 
-RFP Orchestrator helps proposal and security teams prepare enterprise RFP and questionnaire responses from approved company information.
+AI-powered multi-agent system that automates responding to enterprise Request for Proposals (RFPs) and security questionnaires using vector search and NVIDIA NIM LLMs.
 
-## Current phase
+---
 
-The project is in the foundation phase. The immediate goal is to make the repository easy to run, establish the main package boundaries, and validate the first end-to-end workflow with representative documents.
+## Workflow Pipeline
 
-## Project layout
+1. **Upload & Ingest**: Accepts PDF, DOCX, XLSX, and TXT files.
+2. **Extract & Chunk**: Extracts text, segments document chunks, and discovers RFP questions (hybrid regex + LLM).
+3. **Embed & Index**: Generates 2048-dim embeddings (`nvidia/nemotron-3-embed-1b`) stored in Supabase `pgvector`.
+4. **Retrieve**: Performs cosine-similarity semantic search across approved knowledge chunks.
+5. **Draft Answers**: Generates grounded responses with source citations using NVIDIA NIM LLMs.
+6. **Human Review**: Interactive triage with explainable confidence scores (0–100), inline edits, and approval states.
+7. **Export**: Generates clean, ready-to-send Word (`.docx`) and Excel (`.xlsx`) response documents.
 
-- `apps/web` — Next.js web application and server-side API routes.
-- `packages/shared` — shared types and utilities.
-- `packages/ingestion` — document validation and text extraction.
-- `packages/retrieval` — chunking, embeddings, and search.
-- `packages/drafting` — answer generation and citations.
-- `packages/orchestrator` — review routing and workflow coordination.
-- `spec` — product, technology, roadmap, and implementation specifications.
+---
 
-## Local setup
+## Project Structure
 
-Requirements:
+```
+├── apps/
+│   └── web/            # Next.js 14 App Router, UI, and API routes
+├── packages/
+│   ├── drafting/       # LLM response generation and prompt registry
+│   ├── ingestion/      # Multi-format document text & question extraction
+│   ├── orchestrator/   # Review policies, confidence scoring & export service
+│   ├── retrieval/      # Semantic chunking, embeddings & pgvector search
+│   └── shared/         # Common TypeScript types, AI providers & retry utils
+└── spec/               # Plain-language project tracker and agent skills guide
+```
 
-- Node.js 18.17 or newer.
-- npm 10 or newer.
-- A Supabase project for features that use the database or storage.
+---
 
-Start with:
+## Quick Start
+
+### 1. Prerequisites
+- Node.js `20.x` or `24.x`
+- npm `10.x`
+- Supabase project (with PostgreSQL `pgvector`)
+- NVIDIA NIM API Key
+
+### 2. Setup
 
 ```bash
+# Clone and install dependencies
 npm install
-cp .env.example .env.local
+
+# Configure environment
+cp .env.example apps/web/.env.local
+```
+
+Fill in the essential variables in `apps/web/.env.local`:
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+NVIDIA_NIM_API_KEY=your-nvidia-nim-api-key
+NVIDIA_NIM_ENDPOINT=https://integrate.api.nvidia.com/v1
+NVIDIA_EMBEDDING_MODEL=nvidia/nemotron-3-embed-1b
+NVIDIA_LLM_MODEL=meta/llama-3.2-11b-vision-instruct
+```
+
+### 3. Run
+
+```bash
+# Start development server
+npm run dev
+
+# Build all monorepo packages and web app
 npm run build
 ```
 
-The web app can be started with `npm run dev`. Supabase and Redis are optional until the corresponding workflow is enabled.
-
-Do not put real credentials in `.env.example` or commit local environment files.
-
-## Foundation checklist
-
-- [x] Product and implementation specifications written in plain language.
-- [x] Monorepo package boundaries established.
-- [x] Shared domain types and utilities available.
-- [x] Basic web application scaffold available.
-- [x] API health endpoint scaffold available.
-- [x] Add database migrations and Row Level Security policies.
-- [ ] Add representative test documents and an evaluation set.
-- [x] Implement the upload and document-status workflow.
-- [x] Implement the initial document text-extraction pipeline.
-
-## Current progress
-
-Completed through authenticated RFP document upload, extraction, and initial processing statuses. End-to-end Supabase/Vercel validation remains before starting chunking and retrieval.
+The web application runs locally at `http://localhost:3000`.
