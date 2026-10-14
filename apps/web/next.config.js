@@ -50,13 +50,19 @@ if (typeof process !== 'undefined' && typeof process.emitWarning === 'function')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@repo/shared'],
+  transpilePackages: [
+    '@repo/shared',
+    '@repo/ingestion',
+    '@repo/retrieval',
+    '@repo/drafting',
+    '@repo/orchestrator',
+  ],
   images: {
     domains: ['localhost', 'your-project.supabase.co'],
   },
   experimental: {
     instrumentationHook: true,
-    serverComponentsExternalPackages: ['pdf-parse', 'xlsx', 'mammoth'],
+    serverComponentsExternalPackages: ['pdf-parse', 'xlsx', 'mammoth', 'exceljs', 'docx'],
     serverActions: {
       bodySizeLimit: '10mb',
     },

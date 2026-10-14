@@ -63,38 +63,7 @@ services:
         - action: rebuild
           path: ./packages/shared
 
-  # API/Agent Services (optional - can run as separate services)
-  api:
-    build:
-      context: .
-      dockerfile: infra/docker/Dockerfile.api
-    ports:
-      - "4000:4000"
-    environment:
-      - SUPABASE_URL=http://supabase:54321
-      - SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-      - REDIS_URL=redis://redis:6379
-      - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY}
-      - NVIDIA_NIM_ENDPOINT=https://integrate.api.nvidia.com/v1
-    volumes:
-      - ./apps/api:/app
-      - /app/node_modules
-    depends_on:
-      - supabase
-      - redis
-    develop:
-      watch:
-        - action: sync
-          path: ./apps/api
-          target: /app
-        - action: rebuild
-          path: ./packages/ingestion
-        - action: rebuild
-          path: ./packages/retrieval
-        - action: rebuild
-          path: ./packages/drafting
-        - action: rebuild
-          path: ./packages/orchestrator
+
 
 volumes:
   supabase_data:

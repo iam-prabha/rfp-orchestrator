@@ -12,7 +12,6 @@
   "dependencies": {
     "@repo/shared": "*",
     "@supabase/supabase-js": "^2.43.0",
-    "@mastra/core": "^0.1.0",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
