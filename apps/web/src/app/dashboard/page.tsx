@@ -6,6 +6,7 @@ import { NavbarProfile } from '@/components/navbar-profile';
 import { RetryProcessingButton } from '@/components/retry-processing-button';
 import { DeleteRfpButton } from '@/components/delete-rfp-button';
 import { RetrievalSearch } from '@/components/retrieval-search';
+import { Logo } from '@/components/logo';
 
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,15 @@ type DashboardRfp = {
 
 export default async function DashboardPage() {
   const supabase = createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data?.user) {
+      user = data.user;
+    }
+  } catch {
+    user = null;
+  }
   if (!user) redirect('/login');
 
   const [{ data: profile }, rfpQuery] = await Promise.all([
@@ -40,7 +49,7 @@ export default async function DashboardPage() {
   const readyDocuments = (rfps || []).filter((rfp) => rfp.status === 'ready').map((rfp) => ({ id: rfp.id, title: rfp.title }));
 
   return <main className="min-h-screen bg-slate-50">
-    <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8"><span className="font-semibold tracking-tight">RFP Orchestrator</span><NavbarProfile username={username} displayName={profile?.display_name} email={user.email || ''} /></div></header>
+    <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8"><Logo href="/dashboard" size="sm" /><NavbarProfile username={username} displayName={profile?.display_name} email={user.email || ''} /></div></header>
     <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
       <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><p className="text-sm font-medium text-blue-600">Your workspace</p><h1 className="mt-3 text-4xl font-semibold tracking-tight">Welcome, @{username}.</h1><p className="mt-3 text-slate-600">Keep your customer responses moving from upload to review.</p></div><Button asChild><Link href="/dashboard/rfp/new">New RFP</Link></Button></div>
       <RetrievalSearch documents={readyDocuments} />

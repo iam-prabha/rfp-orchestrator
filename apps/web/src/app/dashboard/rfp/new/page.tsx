@@ -5,7 +5,15 @@ import { RfpUploadForm } from '@/components/rfp-upload-form';
 export const dynamic = 'force-dynamic';
 
 export default async function NewRfpPage() {
-  const { data: { user } } = await createServerClient().auth.getUser();
+  let user = null;
+  try {
+    const { data, error } = await createServerClient().auth.getUser();
+    if (!error && data?.user) {
+      user = data.user;
+    }
+  } catch {
+    user = null;
+  }
   if (!user) redirect('/login');
   return <RfpUploadForm />;
 }

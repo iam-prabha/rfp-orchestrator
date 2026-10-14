@@ -126,6 +126,7 @@ export class QuestionExtractionAgent {
 
     const sample = text.slice(0, 4000); // Send first 4k chars to stay fast & within budget
     const prompt = `You are an expert RFP analyzer. Extract the list of questions or RFP requirements from this document snippet.
+If the document is structured as topics, specifications, definitions, or instructions rather than direct questions, formulate the core requirement questions or inquiries that a respondent or vendor must address.
 Return a valid JSON array of objects with keys: "text" (the full question prompt), "section" (the section name, default "General"), "type" ("technical"|"commercial"|"security"|"legal"|"general").
 Only return valid JSON array, no extra commentary.
 
@@ -139,11 +140,26 @@ ${sample}
         temperature: 0.1,
       });
 
-      const cleanJson = res.text.replace(/```(json)?/g, '').trim();
-      const parsed = JSON.parse(cleanJson) as Array<{ text: string; section?: string; type?: QuestionType }>;
+      const rawText = res.text.trim();
+      const firstBracket = rawText.indexOf('[');
+      const lastBracket = rawText.lastIndexOf(']');
+      let jsonStr = rawText;
+      if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+        jsonStr = rawText.substring(firstBracket, lastBracket + 1);
+      } else {
+        jsonStr = rawText.replace(/```(json)?/g, '').trim();
+      }
 
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item, idx) => ({
+      const parsed = JSON.parse(jsonStr);
+      let list: Array<{ text: string; section?: string; type?: QuestionType }> = [];
+      if (Array.isArray(parsed)) {
+        list = parsed;
+      } else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as any).questions)) {
+        list = (parsed as any).questions;
+      }
+
+      if (list.length > 0) {
+        return list.map((item, idx) => ({
           id: uuidv4(),
           text: item.text,
           section: item.section || 'General',

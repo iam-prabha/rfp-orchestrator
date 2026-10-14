@@ -30,6 +30,7 @@ export interface DraftingResult {
 
 export interface DraftingContext {
   question: string;
+  questionId?: string;
   rfpId?: string;
   contextChunks: SearchResult[];
   questionType?: string;
@@ -76,7 +77,7 @@ export class DraftingAgent {
       const llmResponse = await this.callLLM(prompt, {
         temperature: this.config.temperature,
         maxTokens: this.config.maxTokens,
-        stopSequences: ['\n\n', 'Human:', 'Assistant:'],
+        stopSequences: ['Human:', 'Assistant:'],
       });
 
       // Post-process the answer
@@ -100,10 +101,12 @@ export class DraftingAgent {
         endOffset: chunk.endOffset,
       }));
 
+      const resolvedQuestionId = context.questionId || uuidv4();
+
       // Create answer record
       const answer: Omit<Answer, 'id' | 'createdAt' | 'updatedAt'> = {
         rfpId: context.rfpId || '',
-        questionId: uuidv4(),
+        questionId: resolvedQuestionId,
         questionText: context.question,
         generatedAnswer: processedAnswer,
         finalAnswer: null,
@@ -111,6 +114,15 @@ export class DraftingAgent {
         sources,
         status: 'generated',
       };
+
+      // Clean up any previous answer for this question if regenerating
+      if (context.rfpId && context.questionId) {
+        await this.supabase
+          .from('answers')
+          .delete()
+          .eq('rfpId', context.rfpId)
+          .eq('questionId', context.questionId);
+      }
 
       // Store draft answer in Supabase
       const { data: storedAnswer, error } = await this.supabase

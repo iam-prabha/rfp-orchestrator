@@ -78,6 +78,7 @@ export async function POST(
 
     const draftResult = await draftingAgent.generateAnswer({
       question: question.question_text,
+      questionId: question.id,
       rfpId: params.id,
       contextChunks: retrievalResult.results,
       questionType: question.question_type,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { extractDocument, QuestionExtractionAgent, ensureBufferPolyfill } from '@repo/ingestion';
 import { RetrievalAgent } from '@repo/retrieval';
+import { NvidiaNimCompletionProvider } from '@repo/shared';
 
 ensureBufferPolyfill();
 
@@ -105,11 +106,20 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const embeddedAt = new Date().toISOString();
 
     // Extract questions using QuestionExtractionAgent
-    const questionExtractor = new QuestionExtractionAgent();
+    const nimApiKey = process.env.NVIDIA_NIM_API_KEY;
+    const nimEndpoint = process.env.NVIDIA_NIM_ENDPOINT || 'https://integrate.api.nvidia.com/v1';
+    const nimModel = process.env.NVIDIA_LLM_MODEL || 'meta/llama-3.2-11b-vision-instruct';
+
+    const llmProvider = nimApiKey
+      ? new NvidiaNimCompletionProvider(nimApiKey, nimEndpoint, nimModel)
+      : undefined;
+
+    const questionExtractor = new QuestionExtractionAgent(llmProvider);
     const extractionResult = await questionExtractor.extractQuestions(extracted.text, rfp.id);
     const questions = extractionResult.success && extractionResult.data ? extractionResult.data : [];
 
     if (questions.length > 0) {
+      await adminClient.from('answers').delete().eq('rfpId', rfp.id);
       await adminClient.from('questions').delete().eq('rfp_id', rfp.id);
       await adminClient.from('questions').insert(
         questions.map((q) => ({

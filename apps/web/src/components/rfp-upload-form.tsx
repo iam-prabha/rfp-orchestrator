@@ -6,6 +6,7 @@ import { ArrowLeft, FileUp, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase';
+import { Logo } from '@/components/logo';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const FILE_TYPES = {
@@ -65,7 +66,8 @@ export function RfpUploadForm() {
     setIsUploading(true);
     setUploadStage('uploading');
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data } = await supabase.auth.getUser();
+    const user = data?.user;
     const fileType = getFileType(file);
 
     if (!user || !fileType) {
@@ -139,7 +141,8 @@ export function RfpUploadForm() {
   return (
     <main className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center px-6 py-5 lg:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
+          <Logo href="/dashboard" size="sm" />
           <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-950">
             <ArrowLeft className="h-4 w-4" /> Back to workspace
           </Link>

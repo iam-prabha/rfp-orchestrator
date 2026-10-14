@@ -17,7 +17,8 @@ export function ProfileCard({ username, email, displayName }: { username: string
     setSaved(false);
     setIsSaving(true);
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data } = await supabase.auth.getUser();
+    const user = data?.user;
 
     if (!user) {
       setError('Your session has expired. Sign in again to update your profile.');

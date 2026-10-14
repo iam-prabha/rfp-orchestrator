@@ -65,8 +65,16 @@ export default function RfpReviewPage({ params }: { params: { id: string } }) {
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
     try {
       const supabase = createClient();
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
+      const { data, error } = await supabase.auth.getSession();
+      if (error && (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token'))) {
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // ignore
+        }
+        return {};
+      }
+      const token = data?.session?.access_token;
       if (token) return { Authorization: `Bearer ${token}` };
     } catch {
       // fallback

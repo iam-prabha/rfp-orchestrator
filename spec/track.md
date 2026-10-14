@@ -22,10 +22,10 @@ RFP Orchestrator automates answering Request for Proposal (RFP) documents using 
 | Component | Description | Status |
 |---|---|---|
 | **File Ingestion** | Support PDF, DOCX, XLSX, TXT extraction with legacy buffer polyfill | ✅ DONE |
-| **Question Extraction** | Hybrid regex + LLM agent identifying structured RFP questions | ✅ DONE |
+| **Question Extraction** | Hybrid regex + LLM fallback (NvidiaNim) extracting questions from any document | ✅ DONE |
 | **Vector Storage** | Supabase PostgreSQL pgvector configured with 2048-dimension HNSW index | ✅ DONE |
 | **Knowledge Retrieval** | Cosine similarity semantic search across processed document chunks | ✅ DONE |
-| **Drafting Agent** | On-demand per-question drafting via NVIDIA NIM with prompt templates | ✅ DONE |
+| **Drafting Agent** | On-demand drafting with verified questionId linkage and full paragraph support | ✅ DONE |
 | **Confidence Scoring** | Explainable 0-100 score breaking down relevance, citations, and length | ✅ DONE |
 | **Review Dashboard** | Web interface for question triage, inline answer editing, and approval | ✅ DONE |
 | **Document Export** | Generation of clean Word (.docx) and Excel (.xlsx) answer sheets | ✅ DONE |
