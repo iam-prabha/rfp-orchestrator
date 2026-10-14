@@ -59,5 +59,3 @@ Desktop.ini
 logs/
 *.log
 
-# docker
-.docker/
