@@ -12,4 +12,5 @@ module.exports = {
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
   },
+  testPathIgnorePatterns: ['<rootDir>/e2e/'],
 };

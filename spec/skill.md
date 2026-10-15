@@ -49,3 +49,6 @@ Never return a black-box confidence percentage. Reviewers must see why a score w
 
 ### Rule 6: Safe Node Execution
 Document extraction tools (like `pdf-parse`, `mammoth`, `xlsx`) must run on the Node.js runtime (`export const runtime = 'nodejs'`). Keep them in `serverComponentsExternalPackages` in `next.config.js` to prevent bundler errors.
+
+### Rule 7: Zero-DB Touch in Automated Tests
+Tests must never mutate, reset, or alter the Supabase database. Unit tests mock database clients in-memory, and Playwright E2E tests use `page.route()` network interception to handle all database and auth requests locally.

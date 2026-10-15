@@ -67,8 +67,14 @@ NVIDIA_LLM_MODEL=meta/llama-3.2-11b-vision-instruct
 # Start development server
 npm run dev
 
-# Run automated test suite
+# Run automated unit/integration test suite
 npm test
+
+# Run end-to-end browser tests (Playwright)
+npm run test:e2e
+
+# Run Playwright in interactive visual UI mode
+npm run test:e2e:ui
 
 # Build all monorepo packages and web app
 npm run build

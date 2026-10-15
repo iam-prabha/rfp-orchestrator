@@ -31,6 +31,7 @@ RFP Orchestrator automates answering Request for Proposal (RFP) documents using 
 | **Document Export** | Generation of clean Word (.docx) and Excel (.xlsx) answer sheets | ✅ DONE |
 | **Authentication & RLS** | Supabase Auth with Row-Level Security ensuring user data privacy | ✅ DONE |
 | **Automated Test Suite** | Turborepo Jest tests for Auth, Ingestion, Retrieval, Drafting, and Orchestrator | ✅ DONE |
+| **Playwright E2E Tests** | Browser automation suite covering navigation, auth protection, and form validation | ✅ DONE |
 | **Monorepo Build** | Turborepo pipeline with full Next.js 14 Vercel build compatibility | ✅ DONE |
 
 ---
@@ -40,4 +41,3 @@ RFP Orchestrator automates answering Request for Proposal (RFP) documents using 
 - [ ] **Batch Drafting**: Option to run drafting for all questions in an RFP with one click.
 - [ ] **Knowledge Base Management**: Dedicated UI to upload company reference documents and case studies directly.
 - [ ] **Prompt Customization**: Allow users to adjust answer tone and length preferences in the dashboard.
-- [ ] **Automated End-to-End Tests**: Playwright browser flows for complete upload-to-export user journeys.
