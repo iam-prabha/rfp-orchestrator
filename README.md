@@ -67,6 +67,9 @@ NVIDIA_LLM_MODEL=meta/llama-3.2-11b-vision-instruct
 # Start development server
 npm run dev
 
+# Run automated test suite
+npm test
+
 # Build all monorepo packages and web app
 npm run build
 ```
